@@ -1,4 +1,60 @@
+import { useRef } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { STORAGE_KEY } from '../store';
+
+function DataBackup() {
+  const fileRef = useRef(null);
+
+  const exportData = () => {
+    const raw = localStorage.getItem(STORAGE_KEY) || '{}';
+    const blob = new Blob([raw], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `finance-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const importData = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (!parsed.settings || !Array.isArray(parsed.transactions)) {
+          alert("That file doesn't look like a Finance Tracker backup.");
+          return;
+        }
+        if (!confirm('Replace ALL current data with this backup? This cannot be undone.')) return;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        window.location.reload();
+      } catch {
+        alert("Couldn't read that file — it isn't valid JSON.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="mt-auto pt-4 border-t border-white/8 space-y-1">
+      <button
+        onClick={exportData}
+        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-white/45 hover:text-white hover:bg-white/5 cursor-pointer"
+      >
+        <span className="w-4 text-center">⬇</span> Export data
+      </button>
+      <button
+        onClick={() => fileRef.current?.click()}
+        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-white/45 hover:text-white hover:bg-white/5 cursor-pointer"
+      >
+        <span className="w-4 text-center">⬆</span> Import backup
+      </button>
+      <input ref={fileRef} type="file" accept=".json,application/json" onChange={importData} className="hidden" />
+    </div>
+  );
+}
 
 const links = [
   { to: '/', label: 'Dashboard', icon: '◆' },
@@ -37,6 +93,7 @@ export default function Layout() {
             {label}
           </NavLink>
         ))}
+        <DataBackup />
       </aside>
       <main className="flex-1 p-8 max-w-6xl mx-auto w-full">
         <Outlet />

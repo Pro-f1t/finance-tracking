@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-const STORAGE_KEY = 'finance-tracker-v1';
+export const STORAGE_KEY = 'finance-tracker-v1';
 
 export const PAYDAY_CATEGORY = 'Payday';
 // Transfers move money between accounts — they affect balances but never count as spending.
