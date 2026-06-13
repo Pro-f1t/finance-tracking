@@ -53,20 +53,22 @@ function EditableBalance({ value, onSave }) {
 
 function RolloverCard() {
   const { state, actions, derived } = useFinance();
+  const [fromId, setFromId] = useState(state.settings.mainAccountId);
   const [toId, setToId] = useState(state.settings.rolloverAccountId || '');
   const [amount, setAmount] = useState('');
-  const remaining = derived.mainBalance;
+  const remaining = derived.balances[fromId] ?? 0;
+  const fromName = state.accounts.find((a) => a.id === fromId)?.name || 'account';
 
   const submit = (e) => {
     e.preventDefault();
     const value = amount === '' ? remaining : parseFloat(amount);
-    if (!toId || isNaN(value) || value <= 0) return;
+    if (!toId || toId === fromId || isNaN(value) || value <= 0) return;
     const dest = state.accounts.find((a) => a.id === toId);
     actions.transfer({
-      fromId: state.settings.mainAccountId,
+      fromId,
       toId,
       amount: value,
-      note: `Month-end rollover to ${dest?.name || 'account'}`,
+      note: `Rollover: ${fromName} → ${dest?.name || 'account'}`,
     });
     actions.updateSettings({ rolloverAccountId: toId });
     setAmount('');
@@ -76,19 +78,27 @@ function RolloverCard() {
     <Card className="mb-4">
       <h2 className="font-medium">Month-end rollover</h2>
       <p className="text-xs text-white/40 mt-1 mb-4">
-        At the end of each month, move whatever's left of your payday into another account.
-        This logs a transfer — it won't count as spending.
+        Move leftover money between accounts — e.g. what's left of your payday into checking at
+        the end of the month. This logs a transfer, not spending.
       </p>
-      <form onSubmit={submit} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+      <form onSubmit={submit} className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
         <div>
-          <Label>Available in payday account</Label>
+          <Label>From</Label>
+          <Select value={fromId} onChange={(e) => setFromId(e.target.value)}>
+            {state.accounts.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label>Available in {fromName}</Label>
           <p className="text-xl font-semibold text-[#8ea4ff] py-0.5">{fmt(remaining)}</p>
         </div>
         <div>
-          <Label>Roll over to</Label>
+          <Label>To</Label>
           <Select value={toId} onChange={(e) => setToId(e.target.value)} required>
             <option value="" disabled>Choose account…</option>
-            {derived.otherAccounts.map((a) => (
+            {state.accounts.filter((a) => a.id !== fromId).map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}
           </Select>
@@ -105,11 +115,96 @@ function RolloverCard() {
             onChange={(e) => setAmount(e.target.value)}
           />
         </div>
-        <Button type="submit" disabled={remaining <= 0 || !toId}>
+        <Button type="submit" disabled={remaining <= 0 || !toId || toId === fromId}>
           Roll over
         </Button>
       </form>
     </Card>
+  );
+}
+
+function EditableName({ value, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [input, setInput] = useState('');
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (input.trim()) onSave(input.trim());
+          setEditing(false);
+        }}
+        className="flex items-center gap-1.5"
+      >
+        <Input value={input} onChange={(e) => setInput(e.target.value)} className="!w-44 !py-1" autoFocus />
+        <Button type="submit" className="!py-1 !px-2 text-xs">Save</Button>
+        <Button type="button" variant="ghost" className="!py-1 !px-2 text-xs" onClick={() => setEditing(false)}>✕</Button>
+      </form>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => { setInput(value); setEditing(true); }}
+      title="Click to rename"
+      className="group font-medium cursor-pointer hover:text-[#b9c6ff] transition-colors text-left"
+    >
+      {value}
+      <span className="text-xs ml-1.5 opacity-0 group-hover:opacity-50">✎</span>
+    </button>
+  );
+}
+
+function EditableNote({ value, placeholder, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [input, setInput] = useState('');
+
+  if (editing) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSave(input.trim());
+          setEditing(false);
+        }}
+        className="mt-3"
+      >
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          rows={3}
+          autoFocus
+          placeholder={placeholder}
+          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/25 outline-none focus:border-[#3A5BFF]/70 transition-colors resize-y"
+        />
+        <div className="flex gap-2 mt-1.5">
+          <Button type="submit" className="!py-1 !px-3 text-xs">Save</Button>
+          <Button type="button" variant="ghost" className="!py-1 !px-3 text-xs" onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => { setInput(value || ''); setEditing(true); }}
+      className="group block w-full text-left mt-3 cursor-pointer"
+      title="Click to edit note"
+    >
+      {value ? (
+        <p className="text-sm text-white/45 whitespace-pre-wrap group-hover:text-white/65 transition-colors">
+          {value}
+          <span className="text-xs ml-1.5 opacity-0 group-hover:opacity-50">✎</span>
+        </p>
+      ) : (
+        <p className="text-xs text-white/25 group-hover:text-white/45 transition-colors">+ Add a note</p>
+      )}
+    </button>
   );
 }
 
@@ -228,17 +323,24 @@ export default function Accounts() {
           <Card>
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-medium">{derived.mainAccount.name}</p>
+                <EditableName
+                  value={derived.mainAccount.name}
+                  onSave={(name) => actions.updateAccount(derived.mainAccount.id, { name })}
+                />
                 <p className="text-[11px] text-[#8ea4ff]/80 uppercase tracking-wider mt-0.5">
                   Main · payday account
                 </p>
               </div>
               <EditableBalance value={derived.mainBalance} onSave={(v) => actions.setMainBalance(v)} />
             </div>
-            <p className="text-sm text-white/45 mt-3">
-              {fmt(state.settings.paydayAmount)} lands on day {state.settings.paydayDay} of each month.
-              Transactions default to this account, and leftovers can roll over below.
-            </p>
+            <EditableNote
+              value={
+                derived.mainAccount.note ??
+                `${fmt(state.settings.paydayAmount)} lands on day ${state.settings.paydayDay} of each month. Transactions default to this account, and leftovers can roll over below.`
+              }
+              placeholder="Notes — account number, bank, reminders…"
+              onSave={(note) => actions.updateAccount(derived.mainAccount.id, { note })}
+            />
             {payday ? (
               <form onSubmit={savePayday} className="mt-4 grid grid-cols-3 gap-2 items-end">
                 <div>
@@ -270,7 +372,7 @@ export default function Accounts() {
           <Card key={a.id}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-medium">{a.name}</p>
+                <EditableName value={a.name} onSave={(name) => actions.updateAccount(a.id, { name })} />
                 <p className="text-[11px] text-white/35 uppercase tracking-wider mt-0.5">{typeLabel(a.type)}</p>
               </div>
               <EditableBalance
@@ -278,6 +380,11 @@ export default function Accounts() {
                 onSave={(v) => actions.logAccountEntry(a.id, { kind: 'update', amount: v, note: 'Manual balance edit' })}
               />
             </div>
+            <EditableNote
+              value={a.note}
+              placeholder="Notes — account number, bank, goals…"
+              onSave={(note) => actions.updateAccount(a.id, { note })}
+            />
 
             {a.type === 'investment' && (
               <Link
