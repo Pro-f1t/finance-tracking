@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 const pad = (n) => String(n).padStart(2, '0');
 const toStr = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -27,14 +28,16 @@ export default function DatePicker({ value, onChange, className = '' }) {
       }
     };
     const onKey = (e) => e.key === 'Escape' && setOpen(false);
-    const onScroll = () => setOpen(false);
+    const onReposition = () => setOpen(false);
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
-    window.addEventListener('resize', onScroll);
+    window.addEventListener('resize', onReposition);
+    window.addEventListener('scroll', onReposition, true);
     return () => {
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
-      window.removeEventListener('resize', onScroll);
+      window.removeEventListener('resize', onReposition);
+      window.removeEventListener('scroll', onReposition, true);
     };
   }, [open]);
 
@@ -80,10 +83,10 @@ export default function DatePicker({ value, onChange, className = '' }) {
         <span className="text-white/35 text-xs">▾</span>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={popRef}
-          className="fixed z-50 w-66 p-3 rounded-2xl border border-white/12 bg-[#141927] shadow-[0_12px_40px_rgba(0,0,0,0.6)]"
+          className="fixed z-[100] p-3 rounded-2xl border border-white/12 bg-[#141927] shadow-[0_12px_40px_rgba(0,0,0,0.6)]"
           style={{ top: pos.top, left: pos.left, width: 264 }}
         >
           <div className="flex items-center justify-between mb-2">
@@ -152,7 +155,8 @@ export default function DatePicker({ value, onChange, className = '' }) {
           >
             Today
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
