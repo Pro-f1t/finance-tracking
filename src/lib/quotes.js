@@ -70,8 +70,11 @@ export function fetchSeries(symbol, rangeKey) {
 export async function fetchQuote(symbol) {
   const data = await fetchCached(symbol, '5d', '1d', `q:${symbol}`);
   const pts = data.points;
-  const price = data.meta.price ?? pts[pts.length - 1]?.close;
-  const prevClose = pts.length >= 2 ? pts[pts.length - 2].close : data.meta.prevClose;
+  const last = pts[pts.length - 1]?.close;
+  const price = Number.isFinite(data.meta.price) ? data.meta.price : last;
+  let prevClose = pts.length >= 2 ? pts[pts.length - 2].close : data.meta.prevClose;
+  // Without a usable previous close, treat day change as zero rather than NaN.
+  if (!Number.isFinite(prevClose)) prevClose = price;
   return { price, prevClose, name: data.meta.name };
 }
 

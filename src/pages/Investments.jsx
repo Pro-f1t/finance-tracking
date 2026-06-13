@@ -206,9 +206,9 @@ export default function Investments() {
     let value = 0, prevValue = 0, cost = 0, costKnown = true;
     for (const s of symbols) {
       const q = quotes[s];
-      if (!q) { costKnown = false; continue; }
+      if (!q || !Number.isFinite(q.price)) { costKnown = false; continue; }
       value += holdings[s].shares * q.price;
-      prevValue += holdings[s].shares * q.prevClose;
+      prevValue += holdings[s].shares * (Number.isFinite(q.prevClose) ? q.prevClose : q.price);
       if (holdings[s].hasCost) cost += holdings[s].cost;
       else costKnown = false;
     }
